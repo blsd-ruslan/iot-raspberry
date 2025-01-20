@@ -5,12 +5,13 @@ from errors import handle_test_failure, handle_measurement_error
 from logger import Logger
 from machine import Pin
 
+from sensors/smoke_sensor import SmokeSensor
+from sensors/ir_sensor import IRSensor
 
 def load_config():
     with open('config.json') as config_file:
         config = json.load(config_file)  # Using MicroPython's json module
     return config
-
 
 class FireAlarmSystem:
     def __init__(self):
@@ -21,8 +22,8 @@ class FireAlarmSystem:
         self.measurement_interval = self.config["MEASUREMENT_INTERVAL"]
         self.normalization_duration = self.config["NORMALIZATION_DURATION"]  # Time to wait for sensors to normalize
 
-        self.smoke_sensor_pin = Pin(self.config["PINS"]["SMOKE_SENSOR"], Pin.IN)
-        self.ir_sensor_pin = Pin(self.config["PINS"]["IR_SENSOR"], Pin.IN)
+        self.smoke_sensor = SmokeSensor(self.config["PINS"]["SMOKE_SENSOR"])
+        self.ir_sensor = IRSensor(self.config["PINS"]["IR_SENSOR"])
         self.alarm_buzzer_pin = Pin(self.config["PINS"]["ALARM_BUZZER"], Pin.OUT)
         self.led_indicator_pin = Pin(self.config["PINS"]["LED_INDICATOR"], Pin.OUT)
 
@@ -82,18 +83,21 @@ class FireAlarmSystem:
     def test_sensors(self):
         """Test the sensors for basic functionality."""
         self.logger.info("Testing sensors...")
-        # Dummy implementation - Add actual sensor checks here
+        if not self.smoke_sensor.test() or not self.ir_sensor.test():
+            self.logger.error("One or more sensors failed.")
+            # TODO insert some logic
+            return False
         return True
 
     def test_communication(self):
         """Test communication with the MQTT broker."""
         self.logger.info("Testing communication...")
-        # Dummy implementation - Add actual communication checks here
         try:
             self.wifi_proxy.test_connection()
             return True
         except Exception as e:
             self.logger.error(f"Communication test failed: {e}")
+            # TODO insert some logic
             return False
 
     def test_power(self):
@@ -109,10 +113,9 @@ class FireAlarmSystem:
 
         start_time = time.time()
         while time.time() - start_time < self.normalization_duration:
-            # smoke = read_smoke_sensor()
-            smoke = True
+            smoke = self.smoke_sensor.read()
             self.logger.info(f"Smoke sensor reading during normalization: {smoke}")
-            # Add additional conditions if needed for stabilization
+            #  TODO add logic to work with that state
             time.sleep(1)
 
         self.logger.info("Sensors normalized.")
@@ -142,20 +145,14 @@ class FireAlarmSystem:
         """Get readings from sensors."""
         self.logger.info("Performing measurements...")
         try:
-            # data = {
-            #     "smoke": read_smoke_sensor(),
-            #     "ir": read_ir_sensor(),
-            #     "timestamp": time.time()
-            # }
             data = {
-                "smoke": True,
-                "ir": True,
+                "smoke": self.smoke_sensor.read(),
+                "ir": self.ir_sensor.read(),
                 "timestamp": time.time()
             }
             self.logger.info(f"Measurement data: {data}")
             return data
-        # except SensorError as e:
-        except SystemError as e:
+        except Exception as e:
             self.logger.error(f"Measurement error: {str(e)}")
             handle_measurement_error(self.wifi_proxy, str(e))
             return None
