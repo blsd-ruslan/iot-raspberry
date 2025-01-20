@@ -1,7 +1,6 @@
 import time
-from pydantic import json
+import json  # Using MicroPython's default json module
 from wifi_proxy import WiFiProxy
-from baseSensor import read_smoke_sensor, read_ir_sensor, SensorError
 from errors import handle_test_failure, handle_measurement_error
 from logger import Logger
 from machine import Pin
@@ -9,7 +8,7 @@ from machine import Pin
 
 def load_config():
     with open('config.json') as config_file:
-        config = json.load(config_file)
+        config = json.load(config_file)  # Using MicroPython's json module
     return config
 
 
@@ -110,7 +109,8 @@ class FireAlarmSystem:
 
         start_time = time.time()
         while time.time() - start_time < self.normalization_duration:
-            smoke = read_smoke_sensor()
+            # smoke = read_smoke_sensor()
+            smoke = True
             self.logger.info(f"Smoke sensor reading during normalization: {smoke}")
             # Add additional conditions if needed for stabilization
             time.sleep(1)
@@ -142,14 +142,20 @@ class FireAlarmSystem:
         """Get readings from sensors."""
         self.logger.info("Performing measurements...")
         try:
+            # data = {
+            #     "smoke": read_smoke_sensor(),
+            #     "ir": read_ir_sensor(),
+            #     "timestamp": time.time()
+            # }
             data = {
-                "smoke": read_smoke_sensor(),
-                "ir": read_ir_sensor(),
+                "smoke": True,
+                "ir": True,
                 "timestamp": time.time()
             }
             self.logger.info(f"Measurement data: {data}")
             return data
-        except SensorError as e:
+        # except SensorError as e:
+        except SystemError as e:
             self.logger.error(f"Measurement error: {str(e)}")
             handle_measurement_error(self.wifi_proxy, str(e))
             return None
@@ -173,4 +179,3 @@ class FireAlarmSystem:
         self.system_state = state
         self.logger.info(f"System state updated to: {state}")
         self.wifi_proxy.publish_state({"state": state})
-
