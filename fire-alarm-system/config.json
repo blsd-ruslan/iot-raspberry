@@ -1,16 +1,20 @@
 {
+  "WIFI": {
+    "ssid": "romulus-things",
+    "key": "welcome.to.the.romulus"
+  },
   "UNITS": "STANDARD",
   "SMOKE_THRESHOLD": 100,
   "IR_THRESHOLD": 50,
   "MEASUREMENT_INTERVAL": 5,
   "PINS": {
     "SMOKE_SENSOR": 26,
-    "IR_SENSOR": 17,
-    "ALARM_BUZZER": 18,
+    "IR_SENSOR": 15,
+    "ALARM_BUZZER": 14,
     "LED": {
-      "RED": 1,
-      "GREEN": 2,
-      "BLUE": 3
+      "RED": 13,
+      "GREEN": 12,
+      "BLUE": 11
     }
   }
 }
