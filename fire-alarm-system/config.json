@@ -15,5 +15,6 @@
       "GREEN": 12,
       "BLUE": 11
     }
-  }
+  },
+  "SMOKE_SENSOR_CALIBRATION_TIME_IN_SECONDS": 10,
 }
