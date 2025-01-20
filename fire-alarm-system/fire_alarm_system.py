@@ -1,32 +1,44 @@
-import time
 import json  # Using MicroPython's default json module
-from wifi_proxy import WiFiProxy
-from errors import handle_test_failure, handle_measurement_error
-from logger import Logger
+import time
+from enum import Enum
+
 from machine import Pin
 
-from sensors/smoke_sensor import SmokeSensor
-from sensors/ir_sensor import IRSensor
+from errors import handle_test_failure, handle_measurement_error
+from logger import Logger
+from flame_sensor import FlameSensor
+from wifi_proxy import WiFiProxy
+
+from smoke_sensor import SmokeSensor
+
+
+class SystemState(Enum):
+    NOT_STARTED = 'not_started'
+    CALIBRATING = 'calibrating'
+    OK = 'ok'
+    ALARM = 'alarm'
+
 
 def load_config():
     with open('config.json') as config_file:
         config = json.load(config_file)  # Using MicroPython's json module
     return config
 
+
 class FireAlarmSystem:
     def __init__(self):
+        self.state = SystemState.NOT_STARTED
         self.config = load_config()
         self.logger = Logger()
         self.wifi_proxy = WiFiProxy()
-        self.system_state = "INIT"
         self.measurement_interval = self.config["MEASUREMENT_INTERVAL"]
-        self.normalization_duration = self.config["NORMALIZATION_DURATION"]  # Time to wait for sensors to normalize
+        self.calibration_duration = self.config["CALIBRATION_DURATION"]
+        self.calibration_end_time = None
 
         self.smoke_sensor = SmokeSensor(self.config["PINS"]["SMOKE_SENSOR"])
-        self.ir_sensor = IRSensor(self.config["PINS"]["IR_SENSOR"])
+        self.flame_sensor = FlameSensor(self.config["PINS"]["IR_SENSOR"])
         self.alarm_buzzer_pin = Pin(self.config["PINS"]["ALARM_BUZZER"], Pin.OUT)
         self.led_indicator_pin = Pin(self.config["PINS"]["LED_INDICATOR"], Pin.OUT)
-
         self.logger.info("FireAlarmSystem initialized.")
 
     def run(self):
@@ -39,29 +51,33 @@ class FireAlarmSystem:
             handle_test_failure(self.wifi_proxy)
             return
 
-        # Normalize sensors
-        if not self.normalize_sensors():
-            self.logger.error("Sensor normalization failed.")
-            self.set_system_state("ERROR")
-            return
-
         # Initialize system
         self.initialize_system()
 
-        # Main operation loop
         while True:
-            self.logger.info("Sleeping for measurement interval.")
+            self.update_state()
+            # self.logger.info("Sleeping for measurement interval.")
+            if self.state == SystemState.CALIBRATING:
+                # self.publish_state({"info": "Calibration in progress..."})
+                # TODO implement logic of sending data to mqtt
+            elif self.state == SystemState.OK:
+                sensor_data = self.perform_measurements()
+                if sensor_data:
+                    is_critical = self.analyze_data(sensor_data)
+                    if is_critical:
+                        self.logger.warning("Critical state detected.")
+                        self.handle_critical_state()
+                # Replace this with actual sensor readings
+                # sensor_data = {"smoke_level": 0.12, "voltage": 3.3}
+                # self.publish_state(sensor_data)
+                # TODO use lighsleep maybe
             time.sleep(self.measurement_interval)
 
-            # Take measurements
-            sensor_data = self.perform_measurements()
-
-            # Analyze if we got measurements
-            if sensor_data:
-                is_critical = self.analyze_data(sensor_data)
-                if is_critical:
-                    self.logger.warning("Critical state detected.")
-                    self.handle_critical_state()
+    def start_calibration(self):
+        """Start the calibration phase."""
+        self.state = SystemState.CALIBRATING
+        self.calibration_end_time = time.time() + self.calibration_duration
+        print(f"Calibration started. Will end at {self.calibration_end_time}.")
 
     def perform_self_tests(self):
         """Perform self-tests on system components."""
@@ -83,7 +99,7 @@ class FireAlarmSystem:
     def test_sensors(self):
         """Test the sensors for basic functionality."""
         self.logger.info("Testing sensors...")
-        if not self.smoke_sensor.test() or not self.ir_sensor.test():
+        if not self.smoke_sensor.test() or not self.flame_sensor.test():
             self.logger.error("One or more sensors failed.")
             # TODO insert some logic
             return False
@@ -106,34 +122,13 @@ class FireAlarmSystem:
         # Dummy implementation - Add actual power checks here
         return True
 
-    def normalize_sensors(self):
-        """Wait for sensors to stabilize before the system becomes operational."""
-        self.logger.info("Normalizing sensors...")
-        self.set_system_state("INITIALIZING")
-
-        start_time = time.time()
-        while time.time() - start_time < self.normalization_duration:
-            smoke = self.smoke_sensor.read()
-            self.logger.info(f"Smoke sensor reading during normalization: {smoke}")
-            #  TODO add logic to work with that state
-            time.sleep(1)
-
-        self.logger.info("Sensors normalized.")
-        return True
-
     def initialize_system(self):
         """Initialize sensors and system parameters."""
         self.logger.info("Initializing system...")
-        self.calibrate_sensors()
+        self.start_calibration()
         self.set_initial_thresholds()
         self.set_system_state("RUNNING")
         self.logger.info("System initialized and running.")
-
-    def calibrate_sensors(self):
-        """Calibrate sensors before starting the system."""
-        self.logger.info("Calibrating sensors...")
-        # Dummy implementation - Add actual calibration logic here
-        pass
 
     def set_initial_thresholds(self):
         """Set initial thresholds for sensor data analysis."""
@@ -147,7 +142,7 @@ class FireAlarmSystem:
         try:
             data = {
                 "smoke": self.smoke_sensor.read(),
-                "ir": self.ir_sensor.read(),
+                "ir": self.flame_sensor.read(),
                 "timestamp": time.time()
             }
             self.logger.info(f"Measurement data: {data}")
@@ -173,6 +168,13 @@ class FireAlarmSystem:
 
     def set_system_state(self, state):
         """Set and publish the system state."""
-        self.system_state = state
+        self.state = state
         self.logger.info(f"System state updated to: {state}")
         self.wifi_proxy.publish_state({"state": state})
+
+    def update_state(self):
+        """Update the system state based on the calibration timer."""
+        if self.state == SystemState.CALIBRATING:
+            if time.time() >= self.calibration_end_time:
+                self.state = SystemState.OK  # Transition to normal operation
+                print("Calibration complete. System is now OK.")
