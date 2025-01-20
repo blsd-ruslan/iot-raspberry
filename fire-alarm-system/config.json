@@ -5,11 +5,10 @@
   },
   "UNITS": "STANDARD",
   "SMOKE_THRESHOLD": 100,
-  "IR_THRESHOLD": 50,
   "MEASUREMENT_INTERVAL": 5,
   "PINS": {
     "SMOKE_SENSOR": 26,
-    "IR_SENSOR": 15,
+    "FLAME_SENSOR": 15,
     "ALARM_BUZZER": 14,
     "LED": {
       "RED": 13,
