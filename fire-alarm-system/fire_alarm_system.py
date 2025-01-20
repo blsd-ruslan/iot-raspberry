@@ -1,9 +1,10 @@
 import time
 from pydantic import json
 from wifi_proxy import WiFiProxy
-from sensors import read_smoke_sensor, read_ir_sensor, SensorError
+from baseSensor import read_smoke_sensor, read_ir_sensor, SensorError
 from errors import handle_test_failure, handle_measurement_error
 from logger import Logger
+from machine import Pin
 
 
 def load_config():
@@ -20,6 +21,11 @@ class FireAlarmSystem:
         self.system_state = "INIT"
         self.measurement_interval = self.config["MEASUREMENT_INTERVAL"]
         self.normalization_duration = self.config["NORMALIZATION_DURATION"]  # Time to wait for sensors to normalize
+
+        self.smoke_sensor_pin = Pin(self.config["PINS"]["SMOKE_SENSOR"], Pin.IN)
+        self.ir_sensor_pin = Pin(self.config["PINS"]["IR_SENSOR"], Pin.IN)
+        self.alarm_buzzer_pin = Pin(self.config["PINS"]["ALARM_BUZZER"], Pin.OUT)
+        self.led_indicator_pin = Pin(self.config["PINS"]["LED_INDICATOR"], Pin.OUT)
 
         self.logger.info("FireAlarmSystem initialized.")
 
