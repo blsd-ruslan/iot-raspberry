@@ -30,7 +30,7 @@ class FireAlarmSystem:
         self.state = SystemState.NOT_STARTED
         self.config = load_config()
         self.logger = Logger()
-        self.wifi_proxy = WiFiProxy()
+        self.wifi_proxy = WiFiProxy(self.config["WIFI"], self.config["MQTT"])
         self.measurement_interval = self.config["MEASUREMENT_INTERVAL"]
         self.calibration_duration = self.config["CALIBRATION_DURATION"]
         self.calibration_end_time = None

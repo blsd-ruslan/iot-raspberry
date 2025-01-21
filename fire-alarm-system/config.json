@@ -3,6 +3,14 @@
     "ssid": "romulus-things",
     "key": "welcome.to.the.romulus"
   },
+  "MQTT": {
+    "client_id": "smart-alarm",
+    "server": "147.232.22.242",
+    "port": 1883,
+    "user": "maker",
+    "password": "this.is.mqtt",
+    "base_topic": "smart-alarm"
+  },
   "UNITS": "STANDARD",
   "SMOKE_THRESHOLD": 100,
   "MEASUREMENT_INTERVAL": 5,
